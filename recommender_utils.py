@@ -12,7 +12,7 @@ class RecommenderUtils():
         self.itemId = item_id
         self.rating = rating
 
-    def split_ratings_transactions(self, ratings, k = 18, test_size = 0.2,):
+    def split_ratings_transactions(self, ratings, k = 18, test_size = 0.2, random_state=None):
         """Split movielens ratings data to 2, training and testing. Difference with users
         is that this gets train_size % for each splittable user's ratings
         Args:
@@ -37,7 +37,7 @@ class RecommenderUtils():
         train_indexes.append(pure_train)
 
         for name, group in to_split[cols].groupby(self.userId):
-            X1, X2 = train_test_split(group, train_size=train_size)
+            X1, X2 = train_test_split(group, train_size=train_size, random_state=random_state)
             train_indexes.extend(X1.index.tolist())
             test_indexes.extend(X2.index.tolist())
 
@@ -47,7 +47,7 @@ class RecommenderUtils():
         return train_data, test_data
 
 
-    def split_movielens_users(self, ratings, k = 18, train_size = 0.75):
+    def split_movielens_users(self, ratings, k = 18, train_size = 0.75, random_state=None):
         """Split movielens ratings data to 2, training and testing. In this one,
         take train_size % of users and put them into the train set. The rest are
         put into the test set.
@@ -62,7 +62,7 @@ class RecommenderUtils():
 
         users_to_rated = ratings.groupby(self.userId)[self.itemId].size()
         splittable_users = users_to_rated[users_to_rated > k].index.tolist()
-        train_users, test_users = train_test_split(splittable_users, train_size=train_size)
+        train_users, test_users = train_test_split(splittable_users, train_size=train_size, random_state=random_state)
         pure_train = ratings[~ratings[self.userId].isin(splittable_users)].index.tolist()
         train_indexes = ratings[ratings[self.userId].isin(train_users)].index.tolist()
         test_indexes = ratings[ratings[self.userId].isin(test_users)].index.tolist()
@@ -452,7 +452,7 @@ class RecommenderUtils():
         return interactions, rid_to_idx, idx_to_rid, cid_to_idx, idx_to_cid
 
     @staticmethod
-    def train_test_split_sparse(interactions, split_count, split_fraction = 0.25, fraction=None):
+    def train_test_split_sparse(interactions, split_count, split_fraction = 0.25, fraction=None, rng = None):
         """
         Split recommendation data into train and test sets
         Params
@@ -468,6 +468,7 @@ class RecommenderUtils():
             Fraction of users to split off some of their
             interactions into test set. If None, then all
             users are considered.
+        random_state: RandomState
         """
         # Note: likely not the fastest way to do things below.
         train = interactions.copy().tocoo()
@@ -475,7 +476,8 @@ class RecommenderUtils():
 
         if fraction:
             try:
-                user_index = np.random.choice(
+                random_num_gen = np.random if random_state is None else rng
+                user_index = random_num_gen.choice(
                     np.where(np.bincount(train.row) >= split_count)[0],
                     replace=False,
                     size=np.int64(np.floor(fraction * train.shape[0]))
